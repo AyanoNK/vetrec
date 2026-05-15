@@ -32,7 +32,7 @@ class PhysicalExamEvent {
   order int
   title string
   description string
-  findings_by_system (string | string[])? @description("Optional map of body system to finding")
+  findings_by_system string? @description("Body system findings as a comma-separated or free-text string")
 }
 
 class VitalsEvent {
@@ -81,14 +81,7 @@ class RecommendationEvent {
 }
 
 class Timeline {
-  events (
-    HistoryEvent
-    | PhysicalExamEvent
-    | VitalsEvent
-    | DiagnosticEvent
-    | TreatmentEvent
-    | RecommendationEvent
-  )[]
+  events (HistoryEvent | PhysicalExamEvent | VitalsEvent | DiagnosticEvent | TreatmentEvent | RecommendationEvent)[]
 }
 
 function ExtractTimeline(transcript: string) -> Timeline {
