@@ -1,4 +1,5 @@
 from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.api.timeline import (
@@ -17,11 +18,21 @@ from app.core.errors import (
 from app.services.extractor import TimelineExtractor
 
 
+_settings = Settings()
+
+
 def _build_extractor() -> TimelineExtractor:
-    return TimelineExtractor(settings=Settings())
+    return TimelineExtractor(settings=_settings)
 
 
 app = FastAPI(title="Case Timeline API")
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=_settings.cors_origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 app.dependency_overrides[_api_get_extractor] = _build_extractor
 get_extractor = _api_get_extractor
 
