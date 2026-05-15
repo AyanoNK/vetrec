@@ -29,6 +29,17 @@ cd backend
 uv run pytest
 ```
 
+Evals (real LLM, needs API key):
+
+```bash
+cd backend
+uv run pytest -m eval
+```
+
+Evals are deselected from the default test run. They live in `backend/evals/`
+with one JSON fixture per scenario (transcript + expected structural facts) and
+a pytest parametrized runner.
+
 BAML test fixtures (real LLM, needs API key):
 
 ```bash
