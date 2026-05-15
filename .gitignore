@@ -29,3 +29,9 @@ frontend/dist/
 .vscode/
 .idea/
 *.swp
+
+# Coverage
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
