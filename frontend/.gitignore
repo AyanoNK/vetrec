@@ -1,0 +1,14 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+*.tsbuildinfo
+
+# TypeScript emit from non-noEmit projects (vite.config compilation)
+vite.config.js
+vite.config.d.ts
+
+# Editor / OS
+.DS_Store
+*.log
