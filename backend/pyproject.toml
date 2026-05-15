@@ -21,4 +21,8 @@ dev = [
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
-pythonpath = ["."]
+pythonpath = [".", "evals"]
+markers = [
+    "eval: hits the real LLM; needs FIREWORKS_API_KEY. Deselected by default.",
+]
+addopts = "-m 'not eval'"

@@ -1,0 +1,20 @@
+{
+  "name": "emergency_in_progress",
+  "transcript": "Max, 6-year-old intact male boxer, brought in after being struck by a car 30 minutes ago. On presentation: tachycardic at 180 bpm, respiratory rate 60 with shallow breathing, mucous membranes pale, CRT 3 seconds, temperature 99.1F. Mentation dull. Triage exam reveals abrasions on right thoracic wall and right pelvic limb lameness. Placed IV catheter, started lactated ringers bolus 20 mL/kg, currently in progress. Recommended chest radiographs and abdominal FAST scan; owner approved. Considering opioid analgesia pending stabilization.",
+  "expected": {
+    "min_event_count": 4,
+    "required_event_types": ["vitals", "physical_exam", "treatment", "diagnostic"],
+    "vitals": {
+      "heart_rate_bpm": 180,
+      "respiratory_rate": 60,
+      "temperature_f": 99.1,
+      "capillary_refill_seconds": 3
+    },
+    "treatments": [
+      {"name_contains": "lactated", "progress": "InProgress"}
+    ],
+    "diagnostics": [
+      {"test_name_contains": "radiograph", "decision": "Approved"}
+    ]
+  }
+}

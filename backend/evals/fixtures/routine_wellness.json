@@ -1,0 +1,18 @@
+{
+  "name": "routine_wellness",
+  "transcript": "Dr. Patel saw Bella, a 4-year-old female spayed Labrador retriever, today for her annual wellness exam. Owner reports normal appetite, energy, and bowel movements. No coughing or sneezing. Physical exam: bright, alert, responsive. BCS 5/9, mucous membranes pink and moist, capillary refill under 2 seconds. Temperature 101.4F. Heart rate 84 bpm, regular rhythm. Respiratory rate 24, lungs clear. Discussed annual vaccines; owner approved. Administered DA2PP and rabies boosters today. Recommended heartworm prevention monthly. Recheck in one year.",
+  "expected": {
+    "min_event_count": 4,
+    "required_event_types": ["vitals", "treatment", "recommendation"],
+    "vitals": {
+      "temperature_f": 101.4,
+      "heart_rate_bpm": 84,
+      "respiratory_rate": 24
+    },
+    "treatments": [
+      {"name_contains": "DA2PP", "decision": "Approved"},
+      {"name_contains": "rabies", "decision": "Approved"}
+    ],
+    "recommendation_categories": ["FollowUp"]
+  }
+}
