@@ -13,6 +13,7 @@ persistence, no routing. The backend (see
 | Decision | Choice | Rationale |
 |---|---|---|
 | Bundler / framework | Vite + React 18 + TypeScript | Standard modern stack, fast dev loop. |
+| Package manager | `pnpm` | Project-wide preference. `pnpm-lock.yaml` committed. Enabled in Docker via `corepack enable`. |
 | Component library | Material UI (`@mui/material`, `@mui/lab`, `@mui/icons-material`) | Trusted, well-supported. Provides timeline, form inputs, layout, alerts in one package. |
 | Timeline component | `Timeline` from `@mui/lab` | Most trusted React timeline. Stable enough to ship despite the `lab` label. |
 | Forms | `react-hook-form` + `zod` via `@hookform/resolvers/zod` | RHF for ergonomics; zod for schema-as-source-of-truth and TS type inference. |
@@ -327,9 +328,9 @@ verify rendering. Error handlers are set per-test via `server.use(...)`.
 ### Commands
 
 ```bash
-npm test            # vitest watch
-npm test -- --run   # single CI run
-npm run coverage    # vitest --coverage
+pnpm test           # vitest watch
+pnpm test:run       # vitest --run
+pnpm coverage       # vitest --run --coverage
 ```
 
 ## Deployment
@@ -339,10 +340,11 @@ npm run coverage    # vitest --coverage
 ```dockerfile
 FROM node:20-alpine AS build
 WORKDIR /app
-COPY package.json package-lock.json ./
-RUN npm ci
+RUN corepack enable
+COPY package.json pnpm-lock.yaml ./
+RUN pnpm install --frozen-lockfile
 COPY . .
-RUN npm run build
+RUN pnpm build
 
 FROM nginx:1.27-alpine
 COPY --from=build /app/dist /usr/share/nginx/html

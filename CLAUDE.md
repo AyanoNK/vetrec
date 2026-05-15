@@ -27,6 +27,15 @@ fix vitals parsing for missing temperature
   - `pyproject.toml` declares deps; `uv.lock` is committed.
 - No `requirements.txt`, no `pip install`, no Poetry, no Pipenv.
 
+## Node / JavaScript tooling
+
+- Use `pnpm` for everything Node/JS-related.
+  - `pnpm install` to install, `pnpm add <pkg>` to add a dep, `pnpm add -D <pkg>` for a dev dep, `pnpm <script>` to run a package.json script.
+  - `package.json` declares deps; `pnpm-lock.yaml` is committed.
+  - CI install: `pnpm install --frozen-lockfile`.
+- No `npm install`, no `yarn`. No `package-lock.json`. No `yarn.lock`.
+- In Dockerfiles, enable pnpm via `RUN corepack enable` before the install step.
+
 ## Branches and pushes
 
 - Do not push without explicit instruction.
