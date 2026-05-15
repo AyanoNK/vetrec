@@ -1,8 +1,8 @@
 # vetrec — case timeline extractor
 
 Paste a plain-text veterinary consultation transcript and get a structured
-chronological case timeline. FastAPI + BAML on the backend, GLM 5.1 via
-Fireworks for extraction. Frontend follows in a separate iteration.
+chronological case timeline. React + MUI frontend, FastAPI + BAML backend,
+GLM 5.1 via Fireworks for extraction.
 
 ## Quick start (Docker)
 
@@ -12,9 +12,11 @@ cp .env.example .env
 docker compose up --build
 ```
 
-The API is at `http://localhost:8000`.
+- Frontend at `http://localhost:5173`.
+- Backend at `http://localhost:8000`.
+- nginx in the web container proxies `/api/*` to the backend.
 
-## Local development (no Docker)
+## Backend (local dev)
 
 ```bash
 cd backend
@@ -61,6 +63,27 @@ Regenerate the BAML client after editing `.baml` files:
 ```bash
 cd backend
 uv run baml-cli generate
+```
+
+## Frontend (local dev)
+
+```bash
+cd frontend
+pnpm install
+pnpm dev
+```
+
+Vite serves the SPA on `http://localhost:5173` and proxies `/api/*` to
+`http://localhost:8000`. Start the backend separately (`docker compose up api`
+or the local-dev backend instructions above) so the proxy has something to talk to.
+
+Tests (Vitest + React Testing Library + MSW):
+
+```bash
+cd frontend
+pnpm test            # watch mode
+pnpm test:run        # single run (CI)
+pnpm coverage        # 80% gate; HTML report at frontend/coverage/index.html
 ```
 
 ## LLM configuration
