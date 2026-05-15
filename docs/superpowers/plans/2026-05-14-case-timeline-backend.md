@@ -1715,6 +1715,358 @@ git commit -m "add readme"
 
 ---
 
+## Task 19: add evals harness
+
+Adds an automated evaluation suite that runs the real LLM against labeled fixtures and asserts on structured facts (event counts, required event types, specific numeric vitals with strict equality, decision statuses on diagnostics/treatments). Gated behind a pytest marker so it never runs during normal test runs; needs a real `FIREWORKS_API_KEY`.
+
+**Design decisions:**
+- Strict equality on numeric vitals (`temperature_f == 101.4`). Catches drift fast.
+- Extra events the fixture didn't list are allowed silently. Evals only check that required events / fields are present, not that the output set matches exactly.
+
+**Files:**
+- Create: `backend/evals/__init__.py`
+- Create: `backend/evals/fixtures/routine_wellness.json`
+- Create: `backend/evals/fixtures/gi_workup_declined.json`
+- Create: `backend/evals/fixtures/emergency_in_progress.json`
+- Create: `backend/evals/assertions.py`
+- Create: `backend/tests/test_evals.py`
+- Modify: `backend/pyproject.toml` (register `eval` marker, default-deselect)
+- Modify: `README.md` (add a brief "Evals" section)
+
+- [ ] **Step 1: Create evals package**
+
+```bash
+mkdir -p /Users/ayano/vetrec/backend/evals/fixtures
+touch /Users/ayano/vetrec/backend/evals/__init__.py
+```
+
+- [ ] **Step 2: Write the three fixture files**
+
+Each fixture is a JSON file with `name`, `transcript`, and `expected`. The `expected` block lists structural facts the LLM must satisfy. Anything not listed (e.g., extra History events) is allowed.
+
+`backend/evals/fixtures/routine_wellness.json`:
+```json
+{
+  "name": "routine_wellness",
+  "transcript": "Dr. Patel saw Bella, a 4-year-old female spayed Labrador retriever, today for her annual wellness exam. Owner reports normal appetite, energy, and bowel movements. No coughing or sneezing. Physical exam: bright, alert, responsive. BCS 5/9, mucous membranes pink and moist, capillary refill under 2 seconds. Temperature 101.4F. Heart rate 84 bpm, regular rhythm. Respiratory rate 24, lungs clear. Discussed annual vaccines; owner approved. Administered DA2PP and rabies boosters today. Recommended heartworm prevention monthly. Recheck in one year.",
+  "expected": {
+    "min_event_count": 4,
+    "required_event_types": ["vitals", "treatment", "recommendation"],
+    "vitals": {
+      "temperature_f": 101.4,
+      "heart_rate_bpm": 84,
+      "respiratory_rate": 24
+    },
+    "treatments": [
+      {"name_contains": "DA2PP", "decision": "Approved"},
+      {"name_contains": "rabies", "decision": "Approved"}
+    ],
+    "recommendation_categories": ["FollowUp"]
+  }
+}
+```
+
+`backend/evals/fixtures/gi_workup_declined.json`:
+```json
+{
+  "name": "gi_workup_declined",
+  "transcript": "Charlie, 8-year-old neutered male shepherd mix, presented for vomiting two days. Owner reports three episodes of yellow vomit, decreased appetite. Physical exam shows mild dehydration, mucous membranes tacky, abdomen tense on palpation. Temperature 102.8F, heart rate 110, weight 28.5 kg. Recommended CBC, chemistry panel, and abdominal radiographs to evaluate. Owner declined diagnostics today due to cost; agreed to symptomatic treatment. Started maropitant 1 mg/kg subq, given in clinic. Recommended bland diet for 48 hours. Recheck if vomiting persists or worsens.",
+  "expected": {
+    "min_event_count": 4,
+    "required_event_types": ["vitals", "diagnostic", "treatment"],
+    "vitals": {
+      "temperature_f": 102.8,
+      "heart_rate_bpm": 110,
+      "weight_kg": 28.5
+    },
+    "diagnostics": [
+      {"test_name_contains": "CBC", "decision": "Declined"}
+    ],
+    "treatments": [
+      {"name_contains": "maropitant", "decision": "Approved"}
+    ],
+    "recommendation_categories": ["Diet"]
+  }
+}
+```
+
+`backend/evals/fixtures/emergency_in_progress.json`:
+```json
+{
+  "name": "emergency_in_progress",
+  "transcript": "Max, 6-year-old intact male boxer, brought in after being struck by a car 30 minutes ago. On presentation: tachycardic at 180 bpm, respiratory rate 60 with shallow breathing, mucous membranes pale, CRT 3 seconds, temperature 99.1F. Mentation dull. Triage exam reveals abrasions on right thoracic wall and right pelvic limb lameness. Placed IV catheter, started lactated ringers bolus 20 mL/kg, currently in progress. Recommended chest radiographs and abdominal FAST scan; owner approved. Considering opioid analgesia pending stabilization.",
+  "expected": {
+    "min_event_count": 4,
+    "required_event_types": ["vitals", "physical_exam", "treatment", "diagnostic"],
+    "vitals": {
+      "heart_rate_bpm": 180,
+      "respiratory_rate": 60,
+      "temperature_f": 99.1,
+      "capillary_refill_seconds": 3
+    },
+    "treatments": [
+      {"name_contains": "lactated", "progress": "InProgress"}
+    ],
+    "diagnostics": [
+      {"test_name_contains": "radiograph", "decision": "Approved"}
+    ]
+  }
+}
+```
+
+- [ ] **Step 3: Implement `backend/evals/assertions.py`**
+
+```python
+"""Assertion helpers for the evals harness. Each function takes a BAML Timeline
+plus the relevant slice of the fixture's `expected` block and raises AssertionError
+on mismatch with a message clear enough to debug without re-reading the fixture."""
+
+from baml_client.types import Timeline
+
+
+def assert_min_event_count(timeline: Timeline, minimum: int) -> None:
+    actual = len(timeline.events)
+    assert actual >= minimum, (
+        f"expected at least {minimum} events, got {actual}"
+    )
+
+
+def assert_required_event_types(timeline: Timeline, types: list[str]) -> None:
+    actual_types = {event.type for event in timeline.events}
+    missing = [t for t in types if t not in actual_types]
+    assert not missing, (
+        f"missing required event types: {missing}. got: {sorted(actual_types)}"
+    )
+
+
+def assert_vitals_match(timeline: Timeline, expected: dict[str, float]) -> None:
+    vitals = [e for e in timeline.events if e.type == "vitals"]
+    assert vitals, "no vitals event extracted"
+
+    # Merge vitals across all vitals events (in case the LLM split them).
+    merged: dict[str, float | None] = {}
+    for event in vitals:
+        for field in (
+            "temperature_f",
+            "heart_rate_bpm",
+            "respiratory_rate",
+            "weight_kg",
+            "capillary_refill_seconds",
+        ):
+            value = getattr(event, field, None)
+            if value is not None and merged.get(field) is None:
+                merged[field] = value
+
+    for field, expected_value in expected.items():
+        actual = merged.get(field)
+        assert actual == expected_value, (
+            f"vitals.{field}: expected {expected_value}, got {actual}"
+        )
+
+
+def assert_treatment_present(
+    timeline: Timeline,
+    name_contains: str,
+    decision: str | None = None,
+    progress: str | None = None,
+) -> None:
+    needle = name_contains.lower()
+    matches = [
+        e for e in timeline.events
+        if e.type == "treatment" and needle in (e.name or "").lower()
+    ]
+    assert matches, (
+        f"no treatment event with name containing '{name_contains}'"
+    )
+    if decision is not None:
+        decisions = [str(m.decision) for m in matches]
+        assert any(decision in d for d in decisions), (
+            f"treatment '{name_contains}': expected decision {decision}, got {decisions}"
+        )
+    if progress is not None:
+        progresses = [str(m.progress) for m in matches]
+        assert any(progress in p for p in progresses if p), (
+            f"treatment '{name_contains}': expected progress {progress}, got {progresses}"
+        )
+
+
+def assert_diagnostic_present(
+    timeline: Timeline,
+    test_name_contains: str,
+    decision: str | None = None,
+) -> None:
+    needle = test_name_contains.lower()
+    matches = [
+        e for e in timeline.events
+        if e.type == "diagnostic" and needle in (e.test_name or "").lower()
+    ]
+    assert matches, (
+        f"no diagnostic event with test_name containing '{test_name_contains}'"
+    )
+    if decision is not None:
+        decisions = [str(m.decision) for m in matches]
+        assert any(decision in d for d in decisions), (
+            f"diagnostic '{test_name_contains}': expected decision {decision}, got {decisions}"
+        )
+
+
+def assert_recommendation_categories(
+    timeline: Timeline,
+    expected_categories: list[str],
+) -> None:
+    actual = {
+        str(e.category) for e in timeline.events if e.type == "recommendation"
+    }
+    missing = [c for c in expected_categories if not any(c in a for a in actual)]
+    assert not missing, (
+        f"missing recommendation categories: {missing}. got: {sorted(actual)}"
+    )
+```
+
+Note on `str(e.decision)` / `str(e.category)`: BAML enums in Python render as `EnumName.Value` via `str()`. The `decision in d` substring check tolerates whichever format the installed BAML version uses.
+
+- [ ] **Step 4: Implement `backend/tests/test_evals.py`**
+
+```python
+"""Eval suite: runs the real LLM against labeled fixtures and asserts on
+structural facts. Gated by the `eval` pytest marker (default-deselected). Run
+with `uv run pytest -m eval` after setting a real FIREWORKS_API_KEY."""
+
+import json
+from pathlib import Path
+
+import pytest
+
+from app.config import Settings
+from app.services.extractor import TimelineExtractor
+from evals.assertions import (
+    assert_diagnostic_present,
+    assert_min_event_count,
+    assert_recommendation_categories,
+    assert_required_event_types,
+    assert_treatment_present,
+    assert_vitals_match,
+)
+
+
+FIXTURES_DIR = Path(__file__).parent.parent / "evals" / "fixtures"
+
+
+def _load_fixtures() -> list[dict]:
+    return [json.loads(p.read_text()) for p in sorted(FIXTURES_DIR.glob("*.json"))]
+
+
+def _ids(fixtures: list[dict]) -> list[str]:
+    return [f["name"] for f in fixtures]
+
+
+FIXTURES = _load_fixtures()
+
+
+@pytest.mark.eval
+@pytest.mark.parametrize("fixture", FIXTURES, ids=_ids(FIXTURES))
+async def test_extraction_matches_expected(fixture):
+    settings = Settings()
+    extractor = TimelineExtractor(settings=settings)
+    timeline = await extractor.extract(fixture["transcript"])
+
+    expected = fixture["expected"]
+
+    if "min_event_count" in expected:
+        assert_min_event_count(timeline, expected["min_event_count"])
+
+    if "required_event_types" in expected:
+        assert_required_event_types(timeline, expected["required_event_types"])
+
+    if "vitals" in expected:
+        assert_vitals_match(timeline, expected["vitals"])
+
+    for treatment in expected.get("treatments", []):
+        assert_treatment_present(timeline, **treatment)
+
+    for diagnostic in expected.get("diagnostics", []):
+        assert_diagnostic_present(timeline, **diagnostic)
+
+    if "recommendation_categories" in expected:
+        assert_recommendation_categories(timeline, expected["recommendation_categories"])
+```
+
+- [ ] **Step 5: Register the `eval` marker in `backend/pyproject.toml`**
+
+Update the `[tool.pytest.ini_options]` table to add a marker registration and default-deselect it:
+
+```toml
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+pythonpath = [".", "evals"]
+markers = [
+    "eval: hits the real LLM; needs FIREWORKS_API_KEY. Deselected by default.",
+]
+addopts = "-m 'not eval'"
+```
+
+Note `pythonpath` now includes `"evals"` so `from evals.assertions import ...` resolves. Adjust the import in the test file if you prefer a different path layout.
+
+- [ ] **Step 6: Verify normal test run still skips evals**
+
+```bash
+cd /Users/ayano/vetrec/backend && uv run pytest -v
+```
+
+Expected: 21 passed (the existing non-eval suite). No "eval" tests should run. No collection errors.
+
+- [ ] **Step 7: Run the evals against the real LLM**
+
+```bash
+cd /Users/ayano/vetrec/backend && uv run pytest -m eval -v
+```
+
+Expected: 3 tests, ideally all passing. If any fail, report DONE_WITH_CONCERNS with the failure details — do NOT modify the prompt, schema, or fixtures to make them pass; that's a follow-up.
+
+If 1-2 fixtures fail with reasonable LLM variance (e.g., decision wording slightly differs), report the specifics. We can tighten or loosen fixtures based on actual output.
+
+- [ ] **Step 8: Update README**
+
+Insert this section after the "Local development (no Docker)" → "Tests" block, before the "BAML test fixtures" block:
+
+```markdown
+Evals (real LLM, needs API key):
+
+```bash
+cd backend
+uv run pytest -m eval
+```
+
+Evals are deselected from the default test run. They live in `backend/evals/`
+with one JSON fixture per scenario (transcript + expected structural facts) and
+a pytest parametrized runner.
+```
+
+- [ ] **Step 9: Commit in two separate logical commits**
+
+Per project conventions (one logical change per commit), split:
+
+```bash
+cd /Users/ayano/vetrec
+git add backend/evals/ backend/tests/test_evals.py backend/pyproject.toml
+git commit -m "add evals harness"
+
+git add README.md
+git commit -m "document eval suite in readme"
+```
+
+## Self-review for Task 19
+
+- All fixture JSONs parse and have `name`, `transcript`, `expected` keys?
+- `assertions.py` handles missing optional fixture sections gracefully (each `assert_*` is only called if its key is present in `expected`)?
+- Normal `uv run pytest` shows 21 passed (no evals run)?
+- `uv run pytest -m eval` shows 3 tests collected (passing or failing — both are valid outcomes for this task)?
+- Two commits: `add evals harness` and `document eval suite in readme`?
+- No AI attribution anywhere?
+
+---
+
 ## Self-review checklist (for the executor)
 
 Before declaring the plan complete, verify:
