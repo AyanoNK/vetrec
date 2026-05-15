@@ -10,3 +10,9 @@ services:
       - MAX_TRANSCRIPT_CHARS=${MAX_TRANSCRIPT_CHARS:-50000}
       - LLM_TIMEOUT_SECONDS=${LLM_TIMEOUT_SECONDS:-180}
       - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:5173,http://localhost}
+  web:
+    build: ./frontend
+    ports:
+      - "5173:80"
+    depends_on:
+      - api
