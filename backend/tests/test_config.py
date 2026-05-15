@@ -11,7 +11,7 @@ def test_settings_loads_from_env(monkeypatch):
     assert settings.llm_model == "accounts/fireworks/models/glm-5p1"
     assert settings.llm_base_url == "https://api.fireworks.ai/inference/v1"
     assert settings.max_transcript_chars == 50000
-    assert settings.llm_timeout_seconds == 60
+    assert settings.llm_timeout_seconds == 180
 
 
 def test_settings_missing_api_key_raises(monkeypatch):

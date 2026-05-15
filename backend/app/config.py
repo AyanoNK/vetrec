@@ -18,7 +18,7 @@ class Settings(BaseSettings):
     llm_model: str = "accounts/fireworks/models/glm-5p1"
     llm_base_url: str = "https://api.fireworks.ai/inference/v1"
     max_transcript_chars: int = 50000
-    llm_timeout_seconds: int = 60
+    llm_timeout_seconds: int = 180
     cors_origins: Annotated[list[str], NoDecode] = ["http://localhost:5173"]
 
     @field_validator("cors_origins", mode="before")

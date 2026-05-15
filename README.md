@@ -62,7 +62,7 @@ uv run baml-cli generate
 | `LLM_MODEL` | `accounts/fireworks/models/glm-5p1` | swap to any model on Fireworks |
 | `LLM_BASE_URL` | `https://api.fireworks.ai/inference/v1` | swap to any OpenAI-compatible endpoint |
 | `MAX_TRANSCRIPT_CHARS` | `50000` | rejects oversized input with 422 |
-| `LLM_TIMEOUT_SECONDS` | `60` | per-request timeout |
+| `LLM_TIMEOUT_SECONDS` | `180` | per-request timeout; GLM 5.1 calls typically take 60-90s |
 | `CORS_ORIGINS` | `http://localhost:5173` | comma-separated |
 
 Switching providers: point `LLM_BASE_URL` and `LLM_MODEL` at any OpenAI-compatible API
