@@ -29,6 +29,15 @@ cd backend
 uv run pytest
 ```
 
+Tests run with coverage enabled by default; coverage below 80% fails the run.
+For an HTML report:
+
+```bash
+cd backend
+uv run pytest --cov-report=html
+open htmlcov/index.html  # macOS — use xdg-open on Linux
+```
+
 Evals (real LLM, needs API key):
 
 ```bash
