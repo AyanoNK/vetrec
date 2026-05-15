@@ -6,7 +6,10 @@ from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
-        env_file=".env",
+        # Check both backend/.env (for local dev when running uvicorn or pytest
+        # from backend/) and the repo-root .env (used by docker compose). The
+        # first existing file wins; values from later files don't override.
+        env_file=(".env", "../.env"),
         env_file_encoding="utf-8",
         extra="ignore",
     )
