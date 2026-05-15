@@ -20,8 +20,10 @@ will be developed in a later iteration.
 | Schema shape | Discriminated union with typed details | Shows BAML's structured-extraction strength without losing single-timeline ordering. |
 | Backend layout | Layered FastAPI (api / services / schemas) | Standard, easy to extend; clear seams. |
 | Python tooling | `uv` for deps and execution | Project-wide preference. |
+| Coverage gate | `pytest-cov` always on, 80% minimum, fails the run if below | Catches drift early; chosen after the first run showed 96% baseline. |
+| Eval harness | JSON-fixture-driven pytest suite, gated by `-m eval` | Real-LLM regression tests with strict numeric checks; extras allowed. |
 | Frontend stack | Vite + React + TypeScript + Tailwind + React Query | Standard, fast dev loop; React Query covers async states. |
-| Deployment | Docker Compose, two services (`api`, `web`) | Single command to bring up the stack. |
+| Deployment | Docker Compose; `api` service this iteration, `web` joins with the frontend | Single command to bring up the stack. |
 
 ## Architecture
 
@@ -104,7 +106,8 @@ client<llm> GLM51 {
   options {
     base_url env.LLM_BASE_URL        # https://api.fireworks.ai/inference/v1
     api_key env.FIREWORKS_API_KEY
-    model env.LLM_MODEL              # accounts/fireworks/models/glm-4p5
+    model env.LLM_MODEL              # accounts/fireworks/models/glm-5p1
+    temperature 0.0
   }
 }
 ```
@@ -115,16 +118,26 @@ client<llm> GLM51 {
 
 ```
 backend/
-  pyproject.toml           # uv-managed deps
+  pyproject.toml           # uv-managed deps; pytest, coverage, and marker config
   uv.lock
   Dockerfile
+  .dockerignore
   baml_src/
     clients.baml
-    timeline.baml
+    timeline.baml          # schema + ExtractTimeline + three test fixtures
   baml_client/             # generated, committed
   tests/
+    conftest.py            # sets safe env defaults before any test imports
+    test_health.py
+    test_config.py
+    test_errors.py
     test_extractor.py
-    test_api.py
+    test_extract_route.py
+    test_evals.py          # parametrized real-LLM eval suite, marker: eval
+  evals/
+    __init__.py
+    assertions.py          # shared assertion helpers
+    fixtures/*.json        # one file per scenario: transcript + expected
   app/
     main.py                # FastAPI app, CORS, exception handlers, mounts routers
     config.py              # pydantic-settings: keys, URLs, limits, CORS origins
@@ -140,8 +153,14 @@ backend/
 - `LLM_BASE_URL` — default `https://api.fireworks.ai/inference/v1`
 - `LLM_MODEL` — default `accounts/fireworks/models/glm-5p1`
 - `MAX_TRANSCRIPT_CHARS` — default `50000`
-- `LLM_TIMEOUT_SECONDS` — default `60`
+- `LLM_TIMEOUT_SECONDS` — default `180` (GLM 5.1 calls typically take 60–90s; the
+  earlier 60s default was too tight)
 - `CORS_ORIGINS` — comma-separated; default `http://localhost:5173`
+
+Settings are loaded via `pydantic-settings` from env vars and from a `.env` file.
+The Settings class checks `.env` (working directory) and then `../.env` (parent
+directory). This lets the same `.env` at the repo root serve both `docker compose`
+(which expects a root-level `.env`) and `uv run pytest` invoked from `backend/`.
 
 ### Validation rules
 
@@ -205,6 +224,9 @@ Deferred to a later iteration. The shape is captured here for completeness:
 
 ### `docker-compose.yml`
 
+This iteration ships only the `api` service. The `web` service will be added
+when the frontend lands; the eventual shape is shown below it.
+
 ```yaml
 services:
   api:
@@ -214,7 +236,14 @@ services:
       - FIREWORKS_API_KEY=${FIREWORKS_API_KEY}
       - LLM_MODEL=${LLM_MODEL:-accounts/fireworks/models/glm-5p1}
       - LLM_BASE_URL=${LLM_BASE_URL:-https://api.fireworks.ai/inference/v1}
-      - CORS_ORIGINS=http://localhost:5173,http://localhost
+      - MAX_TRANSCRIPT_CHARS=${MAX_TRANSCRIPT_CHARS:-50000}
+      - LLM_TIMEOUT_SECONDS=${LLM_TIMEOUT_SECONDS:-180}
+      - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:5173,http://localhost}
+```
+
+Eventual additional service for the frontend iteration:
+
+```yaml
   web:
     build: ./frontend
     ports: ["5173:80"]
@@ -235,12 +264,43 @@ Multi-stage: `node:20-alpine` build with `npm ci && npm run build`, then
 
 ## Testing
 
-- BAML `test` blocks in `timeline.baml` with three fixtures (routine wellness with
-  vaccines, GI workup with declined diagnostic, emergency with in-progress treatment).
-  Run via `uv run baml-cli test` against the real LLM when a key is present.
-- Unit tests on `TimelineExtractor` with the BAML function patched.
-- FastAPI integration tests using `TestClient` with the extractor mocked.
-- Manual smoke test against the running stack before declaring done.
+Three layers, with different latency and coverage characteristics:
+
+1. **Python unit / integration tests** — always run. BAML is mocked, the
+   extractor is mocked at the route layer, env defaults are seeded by a
+   `tests/conftest.py` so module-level `Settings()` imports succeed without a
+   real API key. Includes:
+   - `test_health`, `test_config`, `test_errors`, `test_extractor`,
+     `test_extract_route`.
+
+2. **BAML test fixtures** — three `test` blocks in `timeline.baml`
+   (`routine_wellness`, `gi_workup_declined`, `emergency_in_progress`). Run via
+   `uv run baml-cli test` against the real LLM when a key is present. These are
+   smoke fixtures, not asserted in detail.
+
+3. **Eval suite** — parametrized pytest tests under `tests/test_evals.py`,
+   loaded from JSON fixtures in `evals/fixtures/`. Each fixture declares a
+   transcript and an `expected` block (min event count, required event types,
+   specific numeric vitals with strict equality, decision/progress statuses on
+   diagnostics and treatments, recommendation categories). Helpers live in
+   `evals/assertions.py`. Gated by the `eval` pytest marker and deselected from
+   the default run via `addopts = "-m 'not eval' ..."`. Run explicitly with
+   `uv run pytest -m eval`. Extras the LLM produces beyond the fixture's
+   expectations are allowed silently; the suite only checks that required facts
+   are present.
+
+### Coverage
+
+`pytest-cov` is wired into the default `addopts`. Every `uv run pytest`
+produces a terminal coverage report. The run fails if total branch coverage
+drops below **80%**.
+
+- Source: `app/` only. The generated `baml_client/`, `evals/`, and `tests/`
+  themselves are excluded.
+- `exclude_lines` covers `pragma: no cover`, `raise NotImplementedError`, and
+  `if TYPE_CHECKING:` blocks.
+- HTML report on demand: `uv run pytest --cov-report=html` writes to
+  `htmlcov/` (gitignored).
 
 ## Out of scope (this iteration)
 
@@ -255,5 +315,6 @@ Multi-stage: `node:20-alpine` build with `npm ci && npm run build`, then
 - Streaming `/extract` via SSE so events appear as they're parsed.
 - Postgres-backed persistence with `cases` and `events` tables.
 - Vitals trending across multiple cases for the same patient.
-- BAML evals against a labeled gold dataset.
+- Expand the eval suite into a larger labeled gold dataset and add quality
+  metrics (precision/recall per event type, per-field accuracy).
 - Swap hand-typed frontend types for BAML's generated TS client.
