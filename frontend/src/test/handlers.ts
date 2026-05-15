@@ -28,7 +28,7 @@ export const defaultHandlers = [
         {
           type: "treatment",
           order: 2,
-          title: "Maropitant administered",
+          title: "Anti-emetic administered",
           description: "Anti-emetic given subq.",
           name: "maropitant",
           dose: "1 mg/kg",
