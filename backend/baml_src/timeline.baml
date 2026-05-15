@@ -90,3 +90,35 @@ class Timeline {
     | RecommendationEvent
   )[]
 }
+
+function ExtractTimeline(transcript: string) -> Timeline {
+  client GLM51
+  prompt #"
+    You are extracting a structured veterinary case timeline from a plain-text
+    consultation transcript.
+
+    Extract events of these six types, IN THE ORDER THEY APPEAR in the transcript:
+    - history: presenting complaint and history of present illness
+    - physical_exam: physical examination findings (excluding vital signs)
+    - vitals: temperature, heart rate, respiratory rate, weight, mucous membranes,
+      capillary refill — capture only what is explicitly stated
+    - diagnostic: tests offered or run; capture whether they were approved or
+      declined by the client
+    - treatment: treatments offered or given; capture decision (approved/declined)
+      and progress (completed/in_progress) when stated
+    - recommendation: vaccines, medications, diet, follow-up plans
+
+    Rules:
+    - Use the `order` field to number events starting at 0 in transcript order.
+    - Each event must have a concise `title` (under 80 chars) and a 1-2 sentence
+      `description` drawn from the transcript. Do not invent details.
+    - Only fill optional fields when the transcript explicitly states them.
+    - If a value is uncertain or absent, omit the field rather than guessing.
+    - Do not merge distinct events; do not duplicate the same event.
+
+    {{ ctx.output_format }}
+
+    Transcript:
+    {{ transcript }}
+  "#
+}
