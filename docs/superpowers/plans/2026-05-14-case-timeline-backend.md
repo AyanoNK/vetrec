@@ -2067,6 +2067,106 @@ git commit -m "document eval suite in readme"
 
 ---
 
+## Task 20: add code coverage with pytest-cov
+
+Add coverage measurement to every `uv run pytest` run, with an 80% minimum threshold that fails the run if total coverage drops below it. Measure `app/` only — exclude generated BAML client and test infrastructure.
+
+**Files:**
+- Modify: `backend/pyproject.toml` — add `pytest-cov` to dev deps, configure coverage and pytest
+- Modify: `.gitignore` — add `.coverage` and `htmlcov/`
+- Modify: `README.md` — brief coverage section
+
+- [ ] **Step 1: Add `pytest-cov` to the dev dependency group in `backend/pyproject.toml`**
+
+Inside `[dependency-groups] dev = [...]`, append `"pytest-cov>=5.0"`.
+
+- [ ] **Step 2: Update `[tool.pytest.ini_options]` in `backend/pyproject.toml`**
+
+Extend `addopts` from `"-m 'not eval'"` to `"-m 'not eval' --cov=app --cov-report=term-missing --cov-fail-under=80"`.
+
+- [ ] **Step 3: Add coverage configuration to `backend/pyproject.toml`**
+
+Append:
+
+```toml
+[tool.coverage.run]
+source = ["app"]
+branch = true
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = false
+exclude_lines = [
+    "pragma: no cover",
+    "raise NotImplementedError",
+    "if TYPE_CHECKING:",
+]
+```
+
+- [ ] **Step 4: Update `/Users/ayano/vetrec/.gitignore`**
+
+Append:
+
+```
+# Coverage
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+```
+
+- [ ] **Step 5: Install and run**
+
+```bash
+cd /Users/ayano/vetrec/backend && uv sync && uv run pytest -v
+```
+
+Expected: 21 tests pass plus a coverage table. Note total coverage percentage.
+
+**If total coverage < 80%**: do NOT remove the threshold. Report `DONE_WITH_CONCERNS` with the actual percentage and the per-file breakdown. The user will decide whether to drop the threshold or add tests.
+
+**If total coverage >= 80%**: continue.
+
+- [ ] **Step 6: Update README**
+
+Find the "Tests:" code block. After the closing triple-backtick of that block (and before the Evals section), insert:
+
+```markdown
+Tests run with coverage enabled by default; coverage falls under 80% will fail
+the run. For an HTML report:
+
+\`\`\`bash
+cd backend
+uv run pytest --cov-report=html
+open htmlcov/index.html  # macOS — use xdg-open on Linux
+\`\`\`
+```
+
+(Use real triple-backticks, not the escaped form.)
+
+- [ ] **Step 7: Commit in two logical commits**
+
+```bash
+cd /Users/ayano/vetrec
+git add backend/pyproject.toml backend/uv.lock .gitignore
+git commit -m "add pytest-cov with 80 percent coverage gate"
+
+git add README.md
+git commit -m "document coverage in readme"
+```
+
+## Self-review for Task 20
+
+- `pytest-cov` listed in dev group?
+- `addopts` includes `--cov=app --cov-report=term-missing --cov-fail-under=80`?
+- `[tool.coverage.run]` and `[tool.coverage.report]` blocks present?
+- `.gitignore` ignores `.coverage*` and `htmlcov/`?
+- `uv run pytest` reports total coverage >= 80%?
+- Two commits: `add pytest-cov with 80 percent coverage gate` and `document coverage in readme`?
+- No AI attribution?
+
+---
+
 ## Self-review checklist (for the executor)
 
 Before declaring the plan complete, verify:
