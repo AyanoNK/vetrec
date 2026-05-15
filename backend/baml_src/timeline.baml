@@ -115,3 +115,52 @@ function ExtractTimeline(transcript: string) -> Timeline {
     {{ transcript }}
   "#
 }
+
+test routine_wellness {
+  functions [ExtractTimeline]
+  args {
+    transcript #"
+      Dr. Patel saw Bella, a 4-year-old female spayed Labrador retriever, today
+      for her annual wellness exam. Owner reports normal appetite, energy, and
+      bowel movements. No coughing or sneezing. Physical exam: bright, alert,
+      responsive. BCS 5/9, mucous membranes pink and moist, capillary refill
+      under 2 seconds. Temperature 101.4F. Heart rate 84 bpm, regular rhythm.
+      Respiratory rate 24, lungs clear. Discussed annual vaccines; owner
+      approved. Administered DA2PP and rabies boosters today. Recommended
+      heartworm prevention monthly. Recheck in one year.
+    "#
+  }
+}
+
+test gi_workup_declined {
+  functions [ExtractTimeline]
+  args {
+    transcript #"
+      Charlie, 8-year-old neutered male shepherd mix, presented for vomiting
+      two days. Owner reports three episodes of yellow vomit, decreased
+      appetite. Physical exam shows mild dehydration, mucous membranes tacky,
+      abdomen tense on palpation. Temperature 102.8F, heart rate 110, weight
+      28.5 kg. Recommended CBC, chemistry panel, and abdominal radiographs to
+      evaluate. Owner declined diagnostics today due to cost; agreed to
+      symptomatic treatment. Started maropitant 1 mg/kg subq, given in clinic.
+      Recommended bland diet for 48 hours. Recheck if vomiting persists or
+      worsens.
+    "#
+  }
+}
+
+test emergency_in_progress {
+  functions [ExtractTimeline]
+  args {
+    transcript #"
+      Max, 6-year-old intact male boxer, brought in after being struck by a
+      car 30 minutes ago. On presentation: tachycardic at 180 bpm, respiratory
+      rate 60 with shallow breathing, mucous membranes pale, CRT 3 seconds,
+      temperature 99.1F. Mentation dull. Triage exam reveals abrasions on
+      right thoracic wall and right pelvic limb lameness. Placed IV catheter,
+      started lactated ringers bolus 20 mL/kg, currently in progress.
+      Recommended chest radiographs and abdominal FAST scan; owner approved.
+      Considering opioid analgesia pending stabilization.
+    "#
+  }
+}
