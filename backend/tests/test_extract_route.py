@@ -9,6 +9,7 @@ from app.core.errors import (
     ExtractionFailedError,
     LLMTimeoutError,
     LLMUnavailableError,
+    NotClinicalTranscriptError,
     TranscriptTooLongError,
 )
 from app.main import app, get_extractor
@@ -105,3 +106,14 @@ def test_extract_handles_timeout(client):
     response = client.post("/extract", json={"transcript": "x"})
     assert response.status_code == 504
     assert response.json()["error"] == "llm_timeout"
+
+
+def test_extract_rejects_non_clinical(client):
+    _override_extractor(
+        AsyncMock(side_effect=NotClinicalTranscriptError(reason="looks like a recipe"))
+    )
+    response = client.post("/extract", json={"transcript": "x"})
+    assert response.status_code == 422
+    body = response.json()
+    assert body["error"] == "not_clinical_transcript"
+    assert body["reason"] == "looks like a recipe"

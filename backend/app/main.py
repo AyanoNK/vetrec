@@ -12,6 +12,7 @@ from app.core.errors import (
     ExtractionFailedError,
     LLMTimeoutError,
     LLMUnavailableError,
+    NotClinicalTranscriptError,
     TimelineError,
     TranscriptTooLongError,
 )
@@ -56,6 +57,18 @@ async def _too_long(_: Request, exc: TranscriptTooLongError):
             "detail": str(exc),
             "length": exc.length,
             "max_length": exc.max_length,
+        },
+    )
+
+
+@app.exception_handler(NotClinicalTranscriptError)
+async def _not_clinical(_: Request, exc: NotClinicalTranscriptError):
+    return JSONResponse(
+        status_code=422,
+        content={
+            "error": "not_clinical_transcript",
+            "detail": str(exc),
+            "reason": exc.reason,
         },
     )
 

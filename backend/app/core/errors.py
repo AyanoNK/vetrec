@@ -25,3 +25,11 @@ class LLMUnavailableError(TimelineError):
 
 class LLMTimeoutError(TimelineError):
     """LLM call exceeded the configured timeout."""
+
+
+class NotClinicalTranscriptError(TimelineError):
+    """Transcript was classified as non-clinical and rejected before extraction."""
+
+    def __init__(self, reason: str) -> None:
+        super().__init__(f"transcript classified as non-clinical: {reason}")
+        self.reason = reason

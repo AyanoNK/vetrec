@@ -16,6 +16,7 @@ from app.core.errors import (
     ExtractionFailedError,
     LLMTimeoutError,
     LLMUnavailableError,
+    NotClinicalTranscriptError,
     TranscriptTooLongError,
 )
 from app.services.extractor import TimelineExtractor
@@ -76,6 +77,13 @@ def _make_timeline_unsorted() -> Timeline:
 
 @patch("app.services.extractor.b")
 async def test_extract_returns_events_sorted_by_order(mock_b):
+    from baml_client.types import ClassificationResult
+    mock_b.ClassifyTranscript = AsyncMock(
+        return_value=ClassificationResult(
+            is_clinical_transcript=True,
+            reason="this is clinical",
+        )
+    )
     mock_b.ExtractTimeline = AsyncMock(return_value=_make_timeline_unsorted())
     extractor = TimelineExtractor(settings=make_settings())
     result = await extractor.extract("Charlie presented for vomiting.")
@@ -84,6 +92,14 @@ async def test_extract_returns_events_sorted_by_order(mock_b):
 
 @patch("app.services.extractor.b")
 async def test_extract_maps_timeout(mock_b):
+    from baml_client.types import ClassificationResult
+    mock_b.ClassifyTranscript = AsyncMock(
+        return_value=ClassificationResult(
+            is_clinical_transcript=True,
+            reason="this is clinical",
+        )
+    )
+
     async def slow(**_):
         await asyncio.sleep(10)
 
@@ -97,8 +113,15 @@ async def test_extract_maps_timeout(mock_b):
 
 @patch("app.services.extractor.b")
 async def test_extract_maps_validation_error(mock_b):
+    from baml_client.types import ClassificationResult
     from baml_py.errors import BamlValidationError
 
+    mock_b.ClassifyTranscript = AsyncMock(
+        return_value=ClassificationResult(
+            is_clinical_transcript=True,
+            reason="this is clinical",
+        )
+    )
     mock_b.ExtractTimeline = AsyncMock(
         side_effect=BamlValidationError(
             prompt="prompt",
@@ -114,8 +137,15 @@ async def test_extract_maps_validation_error(mock_b):
 
 @patch("app.services.extractor.b")
 async def test_extract_maps_http_error(mock_b):
+    from baml_client.types import ClassificationResult
     from baml_py.errors import BamlClientHttpError
 
+    mock_b.ClassifyTranscript = AsyncMock(
+        return_value=ClassificationResult(
+            is_clinical_transcript=True,
+            reason="this is clinical",
+        )
+    )
     mock_b.ExtractTimeline = AsyncMock(
         side_effect=BamlClientHttpError(
             client_name="fireworks",
@@ -131,8 +161,15 @@ async def test_extract_maps_http_error(mock_b):
 
 @patch("app.services.extractor.b")
 async def test_extract_maps_finish_reason_error(mock_b):
+    from baml_client.types import ClassificationResult
     from baml_py.errors import BamlClientFinishReasonError
 
+    mock_b.ClassifyTranscript = AsyncMock(
+        return_value=ClassificationResult(
+            is_clinical_transcript=True,
+            reason="this is clinical",
+        )
+    )
     mock_b.ExtractTimeline = AsyncMock(
         side_effect=BamlClientFinishReasonError(
             prompt="prompt",
@@ -145,3 +182,35 @@ async def test_extract_maps_finish_reason_error(mock_b):
     extractor = TimelineExtractor(settings=make_settings())
     with pytest.raises(ExtractionFailedError):
         await extractor.extract("any transcript")
+
+
+@patch("app.services.extractor.b")
+async def test_extract_rejects_non_clinical_transcript(mock_b):
+    from baml_client.types import ClassificationResult
+    mock_b.ClassifyTranscript = AsyncMock(
+        return_value=ClassificationResult(
+            is_clinical_transcript=False,
+            reason="this looks like a recipe, not a clinical transcript",
+        )
+    )
+    extractor = TimelineExtractor(settings=make_settings())
+    with pytest.raises(NotClinicalTranscriptError) as excinfo:
+        await extractor.extract("recipe transcript")
+    assert "recipe" in excinfo.value.reason
+
+
+@patch("app.services.extractor.b")
+async def test_extract_skips_extraction_when_not_clinical(mock_b):
+    from baml_client.types import ClassificationResult
+    mock_b.ClassifyTranscript = AsyncMock(
+        return_value=ClassificationResult(
+            is_clinical_transcript=False,
+            reason="off-topic",
+        )
+    )
+    mock_b.ExtractTimeline = AsyncMock(
+        side_effect=AssertionError("should not be called on non-clinical input")
+    )
+    extractor = TimelineExtractor(settings=make_settings())
+    with pytest.raises(NotClinicalTranscriptError):
+        await extractor.extract("off-topic text")

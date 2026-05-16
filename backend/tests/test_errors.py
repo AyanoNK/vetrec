@@ -3,6 +3,7 @@ from app.core.errors import (
     ExtractionFailedError,
     LLMTimeoutError,
     LLMUnavailableError,
+    NotClinicalTranscriptError,
     TimelineError,
     TranscriptTooLongError,
 )
@@ -21,5 +22,11 @@ def test_all_domain_errors_share_base():
         ExtractionFailedError,
         LLMUnavailableError,
         LLMTimeoutError,
+        NotClinicalTranscriptError,
     ):
         assert issubclass(cls, TimelineError)
+
+
+def test_not_clinical_carries_reason():
+    err = NotClinicalTranscriptError(reason="looks like a recipe")
+    assert err.reason == "looks like a recipe"
