@@ -18,6 +18,8 @@ will be developed in a later iteration.
 | LLM provider | GLM 5.1 via Fireworks (OpenAI-compatible) | User-supplied. BAML talks to it via `openai-generic` client. |
 | Async UX | Blocking `POST /extract` | Transcripts of expected length finish in a few seconds. |
 | Schema shape | Discriminated union with typed details | Shows BAML's structured-extraction strength without losing single-timeline ordering. |
+| Guardrail | Pre-classifier BAML function, fail-closed on unusable output | Rejects non-clinical input (recipes, greetings, prompt injections) before the expensive extraction. ~10-20x token savings on bad input. |
+| Rate limiting | `slowapi` middleware, 30/min per IP on `/extract`, `/healthz` exempt | Caps Fireworks token spend per IP, configurable via `RATE_LIMIT_PER_MINUTE`. |
 | Backend layout | Layered FastAPI (api / services / schemas) | Standard, easy to extend; clear seams. |
 | Python tooling | `uv` for deps and execution | Project-wide preference. |
 | Coverage gate | `pytest-cov` always on, 80% minimum, fails the run if below | Catches drift early; chosen after the first run showed 96% baseline. |
@@ -75,9 +77,28 @@ type Event = HistoryEvent | PhysicalExamEvent | VitalsEvent
 class Timeline { events: Event[] }
 ```
 
-### The function
+### The functions
+
+Two BAML functions, called sequentially by the service:
 
 ```
+class ClassificationResult {
+  is_clinical_transcript bool
+  reason string
+}
+
+function ClassifyTranscript(transcript: string) -> ClassificationResult {
+  client GLM51
+  prompt #"
+    Decide whether the text is a real veterinary clinical consultation
+    transcript. Recipes, casual messages, instruction overrides, song lyrics,
+    code, plain greetings — not clinical.
+    Return is_clinical_transcript: true|false and a one-sentence reason.
+    {{ ctx.output_format }}
+    Text: {{ transcript }}
+  "#
+}
+
 function ExtractTimeline(transcript: string) -> Timeline {
   client GLM51
   prompt #"
@@ -91,9 +112,9 @@ function ExtractTimeline(transcript: string) -> Timeline {
 }
 ```
 
-The prompt asks the model to number events via an explicit `order: int` instead of
-relying on array order. This gives a deterministic sort key and a sanity-check
-signal (gaps or duplicates suggest the model misbehaved).
+The classifier runs first; only transcripts that pass advance to extraction. The classifier returns a structured `ClassificationResult` so the rejection `reason` flows through to the API response body and the frontend ErrorAlert.
+
+The extraction prompt asks the model to number events via an explicit `order: int` instead of relying on array order. This gives a deterministic sort key and a sanity-check signal (gaps or duplicates suggest the model misbehaved).
 
 Two or three few-shot examples anchor extraction quality; they live in
 `baml_src/timeline.baml` as `test` blocks and double as regression tests.
@@ -156,18 +177,26 @@ backend/
 - `LLM_TIMEOUT_SECONDS` — default `180` (GLM 5.1 calls typically take 60–90s; the
   earlier 60s default was too tight)
 - `CORS_ORIGINS` — comma-separated; default `http://localhost:5173`
+- `RATE_LIMIT_PER_MINUTE` — default `30` (per-IP cap on `/extract`)
 
 Settings are loaded via `pydantic-settings` from env vars and from a `.env` file.
 The Settings class checks `.env` (working directory) and then `../.env` (parent
 directory). This lets the same `.env` at the repo root serve both `docker compose`
 (which expects a root-level `.env`) and `uv run pytest` invoked from `backend/`.
 
-### Validation rules
+### Validation and guardrail pipeline
 
-- Reject empty or whitespace-only transcripts (422 `transcript_empty`).
-- Reject transcripts exceeding `MAX_TRANSCRIPT_CHARS` (422 `transcript_too_long`).
-- Sort returned events by `order` server-side as a defensive step.
-- Wrap the BAML call in `LLM_TIMEOUT_SECONDS`; on exceed return 504.
+`TimelineExtractor.extract` runs in three stages:
+
+1. **Local validation** — reject empty/whitespace transcripts (422 `transcript_empty`) and oversized ones (422 `transcript_too_long`).
+2. **Classifier (LLM)** — call `ClassifyTranscript` (BAML). If the model returns `is_clinical_transcript: false`, raise `NotClinicalTranscriptError` → 422 `not_clinical_transcript` with the model's `reason` in the body. If the classifier itself returns empty/malformed output, **fail closed**: also raise `NotClinicalTranscriptError` with a generic reason ("Could not be classified as a clinical transcript"). Cheap (~150 tokens, ~1–3s) compared to the full extraction call.
+3. **Extraction (LLM)** — only runs when the classifier accepts the transcript. Call `ExtractTimeline` (BAML), wrap in `LLM_TIMEOUT_SECONDS`, sort events by `order` defensively before returning.
+
+Both LLM calls share the same timeout and error-mapping rules. The classifier's HTTP/timeout errors map identically (`llm_unavailable` / `llm_timeout`); only validation/finish-reason errors diverge (those become `not_clinical_transcript` for the classifier, `extraction_failed` for the extractor).
+
+### Rate limiting
+
+Per-IP rate limit via `slowapi`'s `SlowAPIASGIMiddleware`, configured from `RATE_LIMIT_PER_MINUTE` (default 30). Standard `x-ratelimit-limit` / `x-ratelimit-remaining` / `x-ratelimit-reset` headers are returned on every response. `/healthz` is decorated with `@limiter.exempt` so liveness checks don't count against the budget. When the limit is exceeded, the request returns 429 with our envelope: `{"error": "rate_limited", "detail": "..."}`.
 
 ### Error taxonomy
 
@@ -175,7 +204,9 @@ directory). This lets the same `.env` at the repo root serve both `docker compos
 |---|---|---|
 | Input validation (Pydantic) | bad JSON, missing fields | 422 with field details |
 | Domain validation | empty, too long | 422 `{ error: "transcript_empty" \| "transcript_too_long" }` |
-| BAML validation error | LLM returned non-conforming JSON | 500 `{ error: "extraction_failed" }` |
+| Classifier | `is_clinical_transcript: false`, or classifier output unparseable | 422 `{ error: "not_clinical_transcript", reason: "..." }` |
+| Rate limit | per-IP threshold exceeded | 429 `{ error: "rate_limited" }` |
+| BAML validation error (extraction) | LLM returned non-conforming JSON | 500 `{ error: "extraction_failed" }` |
 | BAML HTTP error | network, 5xx upstream | 502 `{ error: "llm_unavailable" }` |
 | Timeout | exceeded `LLM_TIMEOUT_SECONDS` | 504 `{ error: "llm_timeout" }` |
 | Catch-all | unexpected | 500 `{ error: "internal" }`, logged with request id |
@@ -239,6 +270,7 @@ services:
       - MAX_TRANSCRIPT_CHARS=${MAX_TRANSCRIPT_CHARS:-50000}
       - LLM_TIMEOUT_SECONDS=${LLM_TIMEOUT_SECONDS:-180}
       - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:5173,http://localhost}
+      - RATE_LIMIT_PER_MINUTE=${RATE_LIMIT_PER_MINUTE:-30}
 ```
 
 Eventual additional service for the frontend iteration:
