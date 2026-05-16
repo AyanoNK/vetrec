@@ -49,6 +49,24 @@ describe("ErrorAlert", () => {
       .toBeInTheDocument();
   });
 
+  it("renders the not-clinical message with the reason", () => {
+    const err = new ExtractError(422, {
+      error: "not_clinical_transcript",
+      reason: "looks like a recipe, not a clinical transcript",
+    });
+    render(<ErrorAlert error={err} />);
+    expect(
+      screen.getByText(/doesn't look like a veterinary consultation/i)
+    ).toBeInTheDocument();
+    expect(screen.getByText(/looks like a recipe/i)).toBeInTheDocument();
+  });
+
+  it("renders the rate-limited message", () => {
+    const err = new ExtractError(429, { error: "rate_limited" });
+    render(<ErrorAlert error={err} />);
+    expect(screen.getByText(/too many requests/i)).toBeInTheDocument();
+  });
+
   it("falls back to a generic message for non-ExtractError errors", () => {
     render(<ErrorAlert error={new Error("network down")} />);
     expect(screen.getByText(/something went wrong/i)).toBeInTheDocument();

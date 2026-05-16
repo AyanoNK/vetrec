@@ -70,6 +70,8 @@ export interface Timeline {
 export type ApiErrorCode =
   | "transcript_empty"
   | "transcript_too_long"
+  | "not_clinical_transcript"
+  | "rate_limited"
   | "extraction_failed"
   | "llm_unavailable"
   | "llm_timeout"
@@ -80,4 +82,5 @@ export interface ApiError {
   detail?: string;
   length?: number;
   max_length?: number;
+  reason?: string;
 }

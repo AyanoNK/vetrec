@@ -5,6 +5,8 @@ import type { ApiErrorCode } from "../../api/types";
 const MESSAGES: Record<ApiErrorCode, string> = {
   transcript_empty: "Paste a transcript to extract a timeline.",
   transcript_too_long: "Transcript is too long. Trim it and try again.",
+  not_clinical_transcript: "This doesn't look like a veterinary consultation transcript.",
+  rate_limited: "Too many requests. Wait a moment and try again.",
   extraction_failed:
     "The LLM returned an unusable response. Try again or shorten the transcript.",
   llm_unavailable:
@@ -31,6 +33,12 @@ export function ErrorAlert({ error }: Props) {
             <Typography variant="caption" color="text.secondary">
               {error.body.length.toLocaleString()} /{" "}
               {error.body.max_length.toLocaleString()} characters
+            </Typography>
+          )}
+        {error.body.error === "not_clinical_transcript" &&
+          typeof error.body.reason === "string" && (
+            <Typography variant="caption" color="text.secondary">
+              {error.body.reason}
             </Typography>
           )}
       </Alert>
