@@ -36,11 +36,11 @@ class TimelineExtractor:
             )
         except asyncio.TimeoutError as exc:
             raise LLMTimeoutError("classifier call timed out") from exc
-        except BamlClientFinishReasonError as exc:
-            raise ExtractionFailedError(f"classifier stopped early: {exc}") from exc
-        except BamlValidationError as exc:
-            raise ExtractionFailedError(
-                f"classifier output failed validation: {exc}"
+        except (BamlClientFinishReasonError, BamlValidationError) as exc:
+            # Fail-closed: empty or malformed classifier output means the LLM
+            # couldn't make a decision. Reject as non-clinical rather than 500.
+            raise NotClinicalTranscriptError(
+                reason="Could not be classified as a clinical transcript."
             ) from exc
         except BamlClientHttpError as exc:
             raise LLMUnavailableError(f"classifier provider error: {exc}") from exc

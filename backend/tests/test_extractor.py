@@ -214,3 +214,49 @@ async def test_extract_skips_extraction_when_not_clinical(mock_b):
     extractor = TimelineExtractor(settings=make_settings())
     with pytest.raises(NotClinicalTranscriptError):
         await extractor.extract("off-topic text")
+
+
+@patch("app.services.extractor.b")
+async def test_extract_treats_classifier_validation_error_as_not_clinical(mock_b):
+    from baml_py.errors import BamlValidationError
+
+    mock_b.ClassifyTranscript = AsyncMock(
+        side_effect=BamlValidationError(
+            prompt="prompt",
+            message="empty output",
+            raw_output="",
+            detailed_message="classifier returned nothing",
+        )
+    )
+    mock_b.ExtractTimeline = AsyncMock(
+        side_effect=AssertionError(
+            "extraction should not run when classifier fails"
+        )
+    )
+    extractor = TimelineExtractor(settings=make_settings())
+    with pytest.raises(NotClinicalTranscriptError) as excinfo:
+        await extractor.extract("hello!")
+    assert "Could not be classified" in excinfo.value.reason
+
+
+@patch("app.services.extractor.b")
+async def test_extract_treats_classifier_finish_reason_as_not_clinical(mock_b):
+    from baml_py.errors import BamlClientFinishReasonError
+
+    mock_b.ClassifyTranscript = AsyncMock(
+        side_effect=BamlClientFinishReasonError(
+            prompt="prompt",
+            message="model stopped early",
+            raw_output="",
+            finish_reason="length",
+            detailed_message="output truncated",
+        )
+    )
+    mock_b.ExtractTimeline = AsyncMock(
+        side_effect=AssertionError(
+            "extraction should not run when classifier finishes early"
+        )
+    )
+    extractor = TimelineExtractor(settings=make_settings())
+    with pytest.raises(NotClinicalTranscriptError):
+        await extractor.extract("hi")
