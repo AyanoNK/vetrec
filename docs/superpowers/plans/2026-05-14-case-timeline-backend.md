@@ -2167,6 +2167,87 @@ git commit -m "document coverage in readme"
 
 ---
 
+## Task 21: add classifier guardrail
+
+Pre-extraction LLM classifier that rejects non-clinical input (recipes, greetings, prompt injections) with `422 not_clinical_transcript` before the expensive extraction prompt runs. Saves ~10-20x tokens on bad inputs.
+
+**Design:**
+- New BAML function `ClassifyTranscript(transcript) -> ClassificationResult` using the same `GLM51` client. Class has `is_clinical_transcript: bool` and `reason: string`.
+- New domain exception `NotClinicalTranscriptError(reason: str)` in `app/core/errors.py`.
+- `TimelineExtractor.extract` becomes a three-stage pipeline: `_validate` → `_classify` → `_extract_events`. Extraction is skipped entirely when the classifier rejects.
+- **Fail-closed:** if the classifier itself returns empty/malformed output (rare GLM behavior on very short inputs), treat as non-clinical with a generic reason rather than crashing into 500.
+- New `@app.exception_handler(NotClinicalTranscriptError)` mapping to `422 {"error": "not_clinical_transcript", "reason": "..."}`.
+
+**Files:**
+- Modify: `backend/baml_src/timeline.baml` (add `ClassificationResult`, `ClassifyTranscript`, classifier BAML test fixture)
+- Modify: `backend/baml_client/` (regenerated)
+- Modify: `backend/app/core/errors.py` (add `NotClinicalTranscriptError`)
+- Modify: `backend/app/services/extractor.py` (split into `_validate` / `_classify` / `_extract_events`)
+- Modify: `backend/app/main.py` (add handler for `NotClinicalTranscriptError`)
+- Modify: `backend/tests/test_errors.py` (add reason-attribute test + base-class assertion)
+- Modify: `backend/tests/test_extractor.py` (mock classifier as pass-through in existing tests; add classifier-rejects and classifier-fails-closed tests)
+- Modify: `backend/tests/test_extract_route.py` (add `not_clinical_transcript` route test)
+
+**Commits (split per project rules):**
+1. `add classifier baml function` — `.baml` change + `baml_client/` regen in one commit
+2. `reject non-clinical transcripts via classifier` — errors, extractor, handler, tests in one commit
+3. `fail closed when classifier output is unusable` — separate refinement that catches `BamlValidationError` and `BamlClientFinishReasonError` in `_classify` and maps them to `NotClinicalTranscriptError` rather than `ExtractionFailedError`
+
+## Self-review for Task 21
+
+- `ClassifyTranscript` BAML function added with structured output?
+- `baml_client/` regenerated and committed alongside the `.baml` change?
+- `NotClinicalTranscriptError` defined with `reason` attribute?
+- `TimelineExtractor.extract` calls classifier BEFORE extraction; extraction skipped on reject?
+- Classifier validation/finish-reason errors fail-closed to `NotClinicalTranscriptError`?
+- HTTP/timeout errors still map to `LLMUnavailableError` / `LLMTimeoutError` in both stages?
+- Route returns 422 with the classifier's `reason` in the body?
+- All existing tests pass (with classifier mocked as pass-through)?
+- Total tests increase by ~4 (classifier-rejects, fails-closed-on-validation, fails-closed-on-finish-reason, route-422)?
+- No AI attribution?
+
+---
+
+## Task 22: add rate limiting via slowapi
+
+Per-IP rate limit on `/extract` (default 30/min), configurable via `RATE_LIMIT_PER_MINUTE`. `/healthz` exempt.
+
+**Design:**
+- Add `slowapi` to `backend/pyproject.toml`.
+- Add `rate_limit_per_minute: int = 30` to `Settings` in `app/config.py`.
+- In `app/main.py`: build `Limiter(key_func=get_remote_address, default_limits=[f"{_settings.rate_limit_per_minute}/minute"], headers_enabled=True)`. Use `SlowAPIASGIMiddleware` (NOT the BaseHTTPMiddleware-based variant — `SlowAPIASGIMiddleware` supports async exception handlers, which we need to keep the envelope shape consistent).
+- Standard `x-ratelimit-limit` / `x-ratelimit-remaining` / `x-ratelimit-reset` headers on every response.
+- `@_limiter.exempt` on `/healthz`.
+- `@app.exception_handler(RateLimitExceeded)` returns `429 {"error": "rate_limited", "detail": "..."}`.
+- Pass `RATE_LIMIT_PER_MINUTE` through `docker-compose.yml`; document in `.env.example`.
+
+**Files:**
+- Modify: `backend/pyproject.toml` + `uv.lock` (add slowapi)
+- Modify: `backend/app/config.py` (add `rate_limit_per_minute`)
+- Modify: `backend/app/main.py` (Limiter, middleware, exception handler, `/healthz` exempt)
+- Modify: `backend/app/api/timeline.py` (add `Request` parameter to `extract` so slowapi can extract the remote address)
+- Modify: `backend/tests/test_config.py` (default-rate-limit test)
+- Modify: `backend/tests/test_extract_route.py` (headers-present + 429-on-exceed + healthz-exempt tests)
+- Modify: `docker-compose.yml` (pass env var through to api service)
+- Modify: `.env.example` (document new var)
+
+**Commit:** `add rate limiting to extract endpoint` — single commit; this is one logical change.
+
+## Self-review for Task 22
+
+- `slowapi` in deps?
+- `rate_limit_per_minute` defaults to 30 in `Settings`?
+- `SlowAPIASGIMiddleware` added (not the sync variant)?
+- `headers_enabled=True` on the `Limiter`?
+- `/healthz` decorated with `@_limiter.exempt`?
+- `RateLimitExceeded` handler returns the standard envelope?
+- `RATE_LIMIT_PER_MINUTE` plumbed through compose and `.env.example`?
+- At least one test verifies the headers are present?
+- At least one test verifies a tight limit returns 429 with the right envelope (uses `importlib.reload` of `app.main` to apply a lowered limit)?
+- No AI attribution?
+
+---
+
 ## Self-review checklist (for the executor)
 
 Before declaring the plan complete, verify:
