@@ -143,13 +143,22 @@ export type TimelineEvent =
 
 export interface Timeline { events: TimelineEvent[]; }
 
+export type ApiErrorCode =
+  | "transcript_empty"
+  | "transcript_too_long"
+  | "not_clinical_transcript"
+  | "rate_limited"
+  | "extraction_failed"
+  | "llm_unavailable"
+  | "llm_timeout"
+  | "internal";
+
 export interface ApiError {
-  error:
-    | "transcript_empty" | "transcript_too_long"
-    | "extraction_failed" | "llm_unavailable" | "llm_timeout" | "internal";
+  error: ApiErrorCode;
   detail?: string;
   length?: number;
   max_length?: number;
+  reason?: string;
 }
 ```
 
@@ -254,20 +263,25 @@ edit and resubmit after errors.
 `ExtractError.body.error` maps to user-facing messages:
 
 ```typescript
-const MESSAGES: Record<ApiError["error"], string> = {
-  transcript_empty:     "Paste a transcript to extract a timeline.",
-  transcript_too_long:  "Transcript is too long. Trim it and try again.",
-  extraction_failed:    "The LLM returned an unusable response. Try again or shorten the transcript.",
-  llm_unavailable:      "The extraction service is unavailable right now. Try again in a moment.",
-  llm_timeout:          "The extraction took too long and timed out. Try a shorter transcript.",
-  internal:             "Something went wrong on our side.",
+const MESSAGES: Record<ApiErrorCode, string> = {
+  transcript_empty:        "Paste a transcript to extract a timeline.",
+  transcript_too_long:     "Transcript is too long. Trim it and try again.",
+  not_clinical_transcript: "This doesn't look like a veterinary consultation transcript.",
+  rate_limited:            "Too many requests. Wait a moment and try again.",
+  extraction_failed:       "The LLM returned an unusable response. Try again or shorten the transcript.",
+  llm_unavailable:         "The extraction service is unavailable right now. Try again in a moment.",
+  llm_timeout:             "The extraction took too long and timed out. Try a shorter transcript.",
+  internal:                "Something went wrong on our side.",
 };
 ```
 
 `ErrorAlert` renders an MUI `<Alert severity="error">` with the mapped
 message. For `transcript_too_long`, it also includes the `length` and
-`max_length` from the response body. Non-`ExtractError` errors (network
-failures, unparseable responses) fall back to `"Something went wrong."`.
+`max_length` from the response body. For `not_clinical_transcript`, it renders
+the classifier's `reason` as a smaller caption underneath the main message
+(e.g., "The text is a recipe for making pancakes, not a veterinary clinical
+consultation transcript."). Non-`ExtractError` errors (network failures,
+unparseable responses) fall back to `"Something went wrong."`.
 
 ## Testing
 
@@ -322,7 +336,7 @@ verify rendering. Error handlers are set per-test via `server.use(...)`.
 | `components/TranscriptForm.test.tsx` | Submit disabled on empty input; zod error renders inline; char counter updates; `onSubmit` receives trimmed transcript; Clear wipes form and previous result |
 | `components/TimelineView.test.tsx` | One `TimelineItem` per event; respects input order |
 | `components/EventCard.test.tsx` | One test per variant; title + description always render; type-specific fields render when present; null fields don't leak to the DOM |
-| `components/states/ErrorAlert.test.tsx` | Each of the 6 `ApiError.error` codes renders the right message; `transcript_too_long` includes the actual length/max |
+| `components/states/ErrorAlert.test.tsx` | Each of the 8 `ApiErrorCode` values renders the right message; `transcript_too_long` includes the actual length/max; `not_clinical_transcript` includes the classifier's `reason` |
 | `App.test.tsx` (integration) | Full flow: render → type → submit → MSW serves Timeline → timeline renders. Plus empty submit. Plus 502 → ErrorAlert |
 
 ### Commands
