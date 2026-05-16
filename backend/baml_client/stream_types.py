@@ -23,8 +23,12 @@ class StreamState(BaseModel, typing.Generic[StreamStateValueT]):
     value: StreamStateValueT
     state: typing_extensions.Literal["Pending", "Incomplete", "Complete"]
 # #########################################################################
-# Generated classes (7)
+# Generated classes (8)
 # #########################################################################
+
+class ClassificationResult(BaseModel):
+    is_clinical_transcript: typing.Optional[bool] = Field(default=None, description='True only if the text is a real veterinary clinical consultation transcript')
+    reason: typing.Optional[str] = Field(default=None, description='One sentence explaining the classification')
 
 class DiagnosticEvent(BaseModel):
     type: typing.Optional[typing_extensions.Literal['diagnostic']] = None

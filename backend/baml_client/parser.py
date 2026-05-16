@@ -23,6 +23,12 @@ class LlmResponseParser:
     def __init__(self, options: DoNotUseDirectlyCallManager):
         self.__options = options
 
+    def ClassifyTranscript(
+        self, llm_response: str, baml_options: BamlCallOptions = {},
+    ) -> types.ClassificationResult:
+        __result__ = self.__options.merge_options(baml_options).parse_response(function_name="ClassifyTranscript", llm_response=llm_response, mode="request")
+        return typing.cast(types.ClassificationResult, __result__)
+
     def ExtractTimeline(
         self, llm_response: str, baml_options: BamlCallOptions = {},
     ) -> types.Timeline:
@@ -36,6 +42,12 @@ class LlmStreamParser:
 
     def __init__(self, options: DoNotUseDirectlyCallManager):
         self.__options = options
+
+    def ClassifyTranscript(
+        self, llm_response: str, baml_options: BamlCallOptions = {},
+    ) -> stream_types.ClassificationResult:
+        __result__ = self.__options.merge_options(baml_options).parse_response(function_name="ClassifyTranscript", llm_response=llm_response, mode="stream")
+        return typing.cast(stream_types.ClassificationResult, __result__)
 
     def ExtractTimeline(
         self, llm_response: str, baml_options: BamlCallOptions = {},

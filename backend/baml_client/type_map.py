@@ -16,6 +16,9 @@ from . import stream_types
 
 type_map = {
 
+    "types.ClassificationResult": types.ClassificationResult,
+    "stream_types.ClassificationResult": stream_types.ClassificationResult,
+
     "types.DiagnosticEvent": types.DiagnosticEvent,
     "stream_types.DiagnosticEvent": stream_types.DiagnosticEvent,
 

@@ -58,8 +58,12 @@ class RecommendationCategory(str, Enum):
     Other = "Other"
 
 # #########################################################################
-# Generated classes (7)
+# Generated classes (8)
 # #########################################################################
+
+class ClassificationResult(BaseModel):
+    is_clinical_transcript: bool = Field(description='True only if the text is a real veterinary clinical consultation transcript')
+    reason: str = Field(description='One sentence explaining the classification')
 
 class DiagnosticEvent(BaseModel):
     type: typing_extensions.Literal['diagnostic']

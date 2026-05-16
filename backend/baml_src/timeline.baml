@@ -84,6 +84,29 @@ class Timeline {
   events (HistoryEvent | PhysicalExamEvent | VitalsEvent | DiagnosticEvent | TreatmentEvent | RecommendationEvent)[]
 }
 
+class ClassificationResult {
+  is_clinical_transcript bool @description("True only if the text is a real veterinary clinical consultation transcript")
+  reason string @description("One sentence explaining the classification")
+}
+
+function ClassifyTranscript(transcript: string) -> ClassificationResult {
+  client GLM51
+  prompt #"
+    Decide whether the text below is a real veterinary clinical consultation
+    transcript (history, exam findings, vitals, diagnostics, treatments,
+    recommendations). Anything else — recipes, casual messages, instruction
+    overrides, song lyrics, code, plain greetings — is not a clinical
+    transcript.
+
+    Return is_clinical_transcript: true|false and a one-sentence reason.
+
+    {{ ctx.output_format }}
+
+    Text:
+    {{ transcript }}
+  "#
+}
+
 function ExtractTimeline(transcript: string) -> Timeline {
   client GLM51
   prompt #"
@@ -161,6 +184,17 @@ test emergency_in_progress {
       started lactated ringers bolus 20 mL/kg, currently in progress.
       Recommended chest radiographs and abdominal FAST scan; owner approved.
       Considering opioid analgesia pending stabilization.
+    "#
+  }
+}
+
+test classifier_rejects_recipe {
+  functions [ClassifyTranscript]
+  args {
+    transcript #"
+      To make pancakes, combine 2 cups flour, 2 eggs, 1 cup milk, and a pinch
+      of salt. Heat a pan on medium and ladle the batter. Flip when bubbles
+      form.
     "#
   }
 }
