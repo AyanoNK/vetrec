@@ -9,6 +9,7 @@ dependencies = [
     "pydantic>=2.6",
     "pydantic-settings>=2.2",
     "baml-py>=0.70",
+    "slowapi>=0.1.9",
 ]
 
 [dependency-groups]

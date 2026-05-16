@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 
 from app.schemas.timeline import ExtractRequest, ExtractResponse
 from app.services.extractor import TimelineExtractor
@@ -13,6 +13,7 @@ def get_extractor() -> TimelineExtractor:
 
 @router.post("/extract", response_model=ExtractResponse)
 async def extract(
+    request: Request,
     payload: ExtractRequest,
     extractor: TimelineExtractor = Depends(get_extractor),
 ) -> ExtractResponse:

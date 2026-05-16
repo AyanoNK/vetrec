@@ -25,3 +25,9 @@ def test_settings_parses_cors_origins(monkeypatch):
     monkeypatch.setenv("CORS_ORIGINS", "http://localhost:5173,http://localhost")
     settings = Settings(_env_file=None)
     assert settings.cors_origins == ["http://localhost:5173", "http://localhost"]
+
+
+def test_settings_default_rate_limit(monkeypatch):
+    monkeypatch.setenv("FIREWORKS_API_KEY", "fk-test")
+    settings = Settings(_env_file=None)
+    assert settings.rate_limit_per_minute == 30

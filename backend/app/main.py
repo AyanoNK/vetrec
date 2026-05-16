@@ -1,10 +1,14 @@
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from slowapi import Limiter
+from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIASGIMiddleware
+from slowapi.util import get_remote_address
 
 from app.api.timeline import (
-    router as timeline_router,
     get_extractor as _api_get_extractor,
+    router as timeline_router,
 )
 from app.config import Settings
 from app.core.errors import (
@@ -21,12 +25,20 @@ from app.services.extractor import TimelineExtractor
 
 _settings = Settings()
 
+_limiter = Limiter(
+    key_func=get_remote_address,
+    default_limits=[f"{_settings.rate_limit_per_minute}/minute"],
+    headers_enabled=True,
+)
+
 
 def _build_extractor() -> TimelineExtractor:
     return TimelineExtractor(settings=_settings)
 
 
 app = FastAPI(title="Case Timeline API")
+app.state.limiter = _limiter
+app.add_middleware(SlowAPIASGIMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_settings.cors_origins,
@@ -38,6 +50,17 @@ app.dependency_overrides[_api_get_extractor] = _build_extractor
 get_extractor = _api_get_extractor
 
 app.include_router(timeline_router)
+
+
+@app.exception_handler(RateLimitExceeded)
+async def _rate_limited(_: Request, exc: RateLimitExceeded):
+    return JSONResponse(
+        status_code=429,
+        content={
+            "error": "rate_limited",
+            "detail": "Too many requests. Try again in a moment.",
+        },
+    )
 
 
 @app.exception_handler(EmptyTranscriptError)
@@ -103,5 +126,6 @@ async def _timeline_fallback(_: Request, exc: TimelineError):
 
 
 @app.get("/healthz")
+@_limiter.exempt
 def healthz() -> dict[str, str]:
     return {"status": "ok"}

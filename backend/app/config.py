@@ -20,6 +20,7 @@ class Settings(BaseSettings):
     max_transcript_chars: int = 50000
     llm_timeout_seconds: int = 180
     cors_origins: Annotated[list[str], NoDecode] = ["http://localhost:5173"]
+    rate_limit_per_minute: int = 30
 
     @field_validator("cors_origins", mode="before")
     @classmethod
