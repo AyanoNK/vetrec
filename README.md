@@ -206,3 +206,4 @@ Bella, 12-week-old intact female French bulldog, presented for routine puppy wel
 - Persistence (`cases`, `events` tables on Postgres) + revisit-by-id.
 - Vitals trending across multiple cases for the same patient.
 - BAML evals against a labeled gold dataset rather than smoke fixtures.
+- CI for feaure branches
