@@ -200,7 +200,7 @@ Bella, 12-week-old intact female French bulldog, presented for routine puppy wel
 - **BAML test blocks** double as prompt regression tests. They run against the
   real LLM in CI when an API key is present, and are skipped otherwise.
 
-## What I would extend with more time
+## Future work
 
 - Streaming `/extract` via SSE so events appear as they're parsed.
 - Persistence (`cases`, `events` tables on Postgres) + revisit-by-id.
