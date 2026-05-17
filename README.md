@@ -96,6 +96,7 @@ pnpm coverage        # 80% gate; HTML report at frontend/coverage/index.html
 | `MAX_TRANSCRIPT_CHARS` | `50000` | rejects oversized input with 422 |
 | `LLM_TIMEOUT_SECONDS` | `180` | per-request timeout; GLM 5.1 calls typically take 60-90s |
 | `CORS_ORIGINS` | `http://localhost:5173` | comma-separated |
+| `RATE_LIMIT_PER_MINUTE` | `30` | per-IP cap on `/extract`; `/healthz` is exempt |
 
 Switching providers: point `LLM_BASE_URL` and `LLM_MODEL` at any OpenAI-compatible API
 (OpenAI, Ollama, vLLM, etc.) and supply that provider's key as `FIREWORKS_API_KEY`.
@@ -126,6 +127,8 @@ Errors:
 |---|---|---|
 | 422 | `transcript_empty` | empty or whitespace-only input |
 | 422 | `transcript_too_long` | exceeds `MAX_TRANSCRIPT_CHARS` |
+| 422 | `not_clinical_transcript` | classifier rejected the input as non-clinical; response includes `reason` |
+| 429 | `rate_limited` | per-IP request rate exceeded `RATE_LIMIT_PER_MINUTE` |
 | 500 | `extraction_failed` | LLM output failed schema validation |
 | 502 | `llm_unavailable` | provider transport or HTTP error |
 | 504 | `llm_timeout` | exceeded `LLM_TIMEOUT_SECONDS` |
