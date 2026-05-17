@@ -183,7 +183,7 @@ Bella, 12-week-old intact female French bulldog, presented for routine puppy wel
 
 ## Design decisions
 
-- **Stateless.** No database, no persistence. Paste → extract → render → done.
+- **Stateless for first version.** No database, no persistence. Paste → extract → render → done.
   Matches the requirement's described flow with the smallest surface area.
 - **Discriminated union with typed details.** A single `Event[]` array carries the
   timeline in transcript order; each variant has type-specific fields (Vitals
@@ -206,5 +206,3 @@ Bella, 12-week-old intact female French bulldog, presented for routine puppy wel
 - Persistence (`cases`, `events` tables on Postgres) + revisit-by-id.
 - Vitals trending across multiple cases for the same patient.
 - BAML evals against a labeled gold dataset rather than smoke fixtures.
-- Frontend (see follow-up plan).
-- Swap hand-typed frontend types for BAML's generated TypeScript client.
