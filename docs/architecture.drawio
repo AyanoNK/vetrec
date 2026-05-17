@@ -1,0 +1,112 @@
+<mxGraphModel adaptiveColors="auto">
+  <root>
+    <mxCell id="0"/>
+    <mxCell id="1" parent="0"/>
+    <mxCell id="title" value="vetrec — Case Timeline Extractor" style="text;html=1;align=center;verticalAlign=middle;fontSize=20;fontStyle=1;" vertex="1" parent="1">
+      <mxGeometry x="40" y="20" width="1200" height="30" as="geometry"/>
+    </mxCell>
+    <mxCell id="subtitle" value="Stateless React + FastAPI + BAML + Fireworks GLM 5.1" style="text;html=1;align=center;verticalAlign=middle;fontSize=12;fontStyle=2;fontColor=#666666;" vertex="1" parent="1">
+      <mxGeometry x="40" y="50" width="1200" height="22" as="geometry"/>
+    </mxCell>
+    <mxCell id="env" value=".env (gitignored)&#10;&#10;FIREWORKS_API_KEY&#10;LLM_MODEL=glm-5p1&#10;LLM_BASE_URL&#10;MAX_TRANSCRIPT_CHARS=50000&#10;LLM_TIMEOUT_SECONDS=180&#10;RATE_LIMIT_PER_MINUTE=30&#10;CORS_ORIGINS" style="shape=note;fillColor=#fff8b3;strokeColor=#a8a800;fontSize=10;align=left;spacingLeft=8;" vertex="1" parent="1">
+      <mxGeometry x="1040" y="90" width="200" height="160" as="geometry"/>
+    </mxCell>
+    <mxCell id="browser" value="Browser&#10;localhost:5173" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=12;fontStyle=1;" vertex="1" parent="1">
+      <mxGeometry x="40" y="380" width="140" height="90" as="geometry"/>
+    </mxCell>
+    <mxCell id="browser_inner" value="TranscriptForm (RHF + zod)&#10;TimelineView (MUI)&#10;ErrorAlert" style="text;align=left;fontSize=9;fontColor=#333333;spacingLeft=4;" vertex="1" parent="1">
+      <mxGeometry x="40" y="475" width="140" height="48" as="geometry"/>
+    </mxCell>
+    <mxCell id="compose" value="docker compose network" style="rounded=0;dashed=1;fillColor=none;strokeColor=#666666;verticalAlign=top;fontSize=11;fontStyle=2;align=left;startSize=22;spacingLeft=8;" vertex="1" parent="1">
+      <mxGeometry x="220" y="90" width="800" height="770" as="geometry"/>
+    </mxCell>
+    <mxCell id="web" value="web service — nginx:1.27-alpine&#10;host port 5173 → container port 80" style="rounded=0;fillColor=#d5e8d4;strokeColor=#82b366;verticalAlign=top;fontSize=11;fontStyle=1;align=left;startSize=42;spacingLeft=8;" vertex="1" parent="1">
+      <mxGeometry x="240" y="130" width="760" height="220" as="geometry"/>
+    </mxCell>
+    <mxCell id="spa" value="React SPA bundle&#10;(served by nginx)" style="rounded=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;fontStyle=1;" vertex="1" parent="1">
+      <mxGeometry x="260" y="190" width="220" height="60" as="geometry"/>
+    </mxCell>
+    <mxCell id="spa_libs" value="React 18 + MUI 5 + @mui/lab Timeline&#10;react-hook-form + zod&#10;TanStack Query (useExtractTimeline)" style="text;align=left;fontSize=9;fontColor=#555555;spacingLeft=4;" vertex="1" parent="1">
+      <mxGeometry x="260" y="255" width="220" height="48" as="geometry"/>
+    </mxCell>
+    <mxCell id="nginx_proxy" value="location /api/ → proxy_pass http://api:8000/&#10;strips /api/ prefix&#10;proxy_read_timeout 300s" style="rounded=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;align=left;spacingLeft=8;" vertex="1" parent="1">
+      <mxGeometry x="500" y="190" width="480" height="60" as="geometry"/>
+    </mxCell>
+    <mxCell id="nginx_fallback" value="location / → try_files $uri $uri/ /index.html  (SPA fallback)" style="rounded=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;align=left;spacingLeft=8;" vertex="1" parent="1">
+      <mxGeometry x="500" y="260" width="480" height="40" as="geometry"/>
+    </mxCell>
+    <mxCell id="nginx_config" value="config: frontend/nginx.conf" style="text;align=left;fontSize=9;fontStyle=2;fontColor=#666666;spacingLeft=4;" vertex="1" parent="1">
+      <mxGeometry x="500" y="305" width="480" height="20" as="geometry"/>
+    </mxCell>
+    <mxCell id="api" value="api service — FastAPI + uvicorn (Python 3.12, uv)&#10;host port 8000 → container port 8000" style="rounded=0;fillColor=#dae8fc;strokeColor=#6c8ebf;verticalAlign=top;fontSize=11;fontStyle=1;align=left;startSize=42;spacingLeft=8;" vertex="1" parent="1">
+      <mxGeometry x="240" y="380" width="760" height="460" as="geometry"/>
+    </mxCell>
+    <mxCell id="cors" value="CORSMiddleware&#10;allow_origins = CORS_ORIGINS" style="rounded=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;" vertex="1" parent="1">
+      <mxGeometry x="260" y="440" width="220" height="50" as="geometry"/>
+    </mxCell>
+    <mxCell id="rate" value="SlowAPIASGIMiddleware&#10;30/min per IP (configurable)&#10;/healthz exempt" style="rounded=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;" vertex="1" parent="1">
+      <mxGeometry x="500" y="440" width="220" height="50" as="geometry"/>
+    </mxCell>
+    <mxCell id="healthz" value="GET /healthz&#10;{status: ok}" style="rounded=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=10;" vertex="1" parent="1">
+      <mxGeometry x="740" y="440" width="240" height="50" as="geometry"/>
+    </mxCell>
+    <mxCell id="route" value="POST /extract  (router: app/api/timeline.py)" style="rounded=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=11;fontStyle=1;align=left;spacingLeft=10;" vertex="1" parent="1">
+      <mxGeometry x="260" y="505" width="720" height="40" as="geometry"/>
+    </mxCell>
+    <mxCell id="pipeline_label" value="TimelineExtractor pipeline  (app/services/extractor.py)" style="text;align=left;fontSize=10;fontStyle=2;fontColor=#444444;spacingLeft=4;" vertex="1" parent="1">
+      <mxGeometry x="260" y="555" width="720" height="20" as="geometry"/>
+    </mxCell>
+    <mxCell id="stage_validate" value="1. _validate&#10;empty / whitespace → 422 transcript_empty  ·  &gt; MAX_TRANSCRIPT_CHARS → 422 transcript_too_long" style="rounded=1;fillColor=#d4e1f5;strokeColor=#6c8ebf;fontSize=10;align=left;spacingLeft=10;" vertex="1" parent="1">
+      <mxGeometry x="260" y="580" width="720" height="50" as="geometry"/>
+    </mxCell>
+    <mxCell id="stage_classify" value="2. _classify  → BAML ClassifyTranscript (LLM)&#10;is_clinical_transcript=false → 422 not_clinical_transcript (with reason)&#10;fail-closed: unparseable classifier output → also 422 not_clinical_transcript" style="rounded=1;fillColor=#d4e1f5;strokeColor=#6c8ebf;fontSize=10;align=left;spacingLeft=10;" vertex="1" parent="1">
+      <mxGeometry x="260" y="640" width="720" height="60" as="geometry"/>
+    </mxCell>
+    <mxCell id="stage_extract" value="3. _extract_events  → BAML ExtractTimeline (LLM)&#10;sort events by order  →  200 { events: TimelineEvent[] }" style="rounded=1;fillColor=#d4e1f5;strokeColor=#6c8ebf;fontSize=10;align=left;spacingLeft=10;" vertex="1" parent="1">
+      <mxGeometry x="260" y="710" width="720" height="50" as="geometry"/>
+    </mxCell>
+    <mxCell id="errors" value="exception handlers → JSON envelope { error, detail, reason?, length?, max_length? }&#10;422 transcript_empty · 422 transcript_too_long · 422 not_clinical_transcript · 429 rate_limited&#10;500 extraction_failed · 502 llm_unavailable · 504 llm_timeout · 500 internal" style="rounded=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=9;align=left;spacingLeft=10;" vertex="1" parent="1">
+      <mxGeometry x="260" y="775" width="720" height="55" as="geometry"/>
+    </mxCell>
+    <mxCell id="baml_label" value="BAML  (.baml schema + generated client)" style="text;align=left;fontSize=10;fontStyle=2;fontColor=#444444;spacingLeft=4;" vertex="1" parent="1">
+      <mxGeometry x="1040" y="380" width="200" height="20" as="geometry"/>
+    </mxCell>
+    <mxCell id="baml" value="GLM51 client&#10;provider: openai-generic&#10;temperature: 0.0&#10;retry: exponential, max 2" style="rounded=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=10;align=left;spacingLeft=8;" vertex="1" parent="1">
+      <mxGeometry x="1040" y="410" width="200" height="100" as="geometry"/>
+    </mxCell>
+    <mxCell id="fireworks" value="Fireworks API&#10;(external)&#10;&#10;GLM 5.1&#10;chat/completions" style="ellipse;whiteSpace=wrap;html=1;fillColor=#e6e6e6;strokeColor=#666666;fontSize=11;fontStyle=1;" vertex="1" parent="1">
+      <mxGeometry x="1060" y="560" width="160" height="120" as="geometry"/>
+    </mxCell>
+    <mxCell id="testing" value="Quality gates&#10;&#10;pytest (80% cov, 31 tests)&#10;baml-cli test (3 LLM fixtures)&#10;pytest -m eval (3 real-LLM evals)&#10;vitest (36 tests, 80% cov)" style="rounded=1;fillColor=#e8f5e9;strokeColor=#82b366;fontSize=9;align=left;spacingLeft=8;verticalAlign=top;spacingTop=4;" vertex="1" parent="1">
+      <mxGeometry x="40" y="720" width="160" height="120" as="geometry"/>
+    </mxCell>
+    <mxCell id="edge_b_w" value="HTTP&#10;/api/extract" style="endArrow=classic;startArrow=classic;html=1;rounded=1;fontSize=9;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="browser" target="web">
+      <mxGeometry relative="1" as="geometry"/>
+    </mxCell>
+    <mxCell id="edge_w_a" value="proxy_pass" style="endArrow=classic;html=1;rounded=1;fontSize=9;exitX=0.3;exitY=1;entryX=0.3;entryY=0;" edge="1" parent="1" source="nginx_proxy" target="cors">
+      <mxGeometry relative="1" as="geometry"/>
+    </mxCell>
+    <mxCell id="edge_classify_baml" value="b.ClassifyTranscript()" style="endArrow=classic;html=1;rounded=1;fontSize=9;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="stage_classify" target="baml">
+      <mxGeometry relative="1" as="geometry">
+        <Array as="points">
+          <mxPoint x="1020" y="670"/>
+          <mxPoint x="1020" y="460"/>
+        </Array>
+      </mxGeometry>
+    </mxCell>
+    <mxCell id="edge_extract_baml" value="b.ExtractTimeline()" style="endArrow=classic;html=1;rounded=1;fontSize=9;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="stage_extract" target="baml">
+      <mxGeometry relative="1" as="geometry">
+        <Array as="points">
+          <mxPoint x="1020" y="735"/>
+          <mxPoint x="1020" y="480"/>
+        </Array>
+      </mxGeometry>
+    </mxCell>
+    <mxCell id="edge_baml_fw" value="HTTPS&#10;chat/completions" style="endArrow=classic;html=1;rounded=1;fontSize=9;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="baml" target="fireworks">
+      <mxGeometry relative="1" as="geometry"/>
+    </mxCell>
+    <mxCell id="edge_env_api" value="loaded by Settings" style="endArrow=classic;dashed=1;html=1;rounded=1;fontSize=9;exitX=0;exitY=1;entryX=1;entryY=0;" edge="1" parent="1" source="env" target="api">
+      <mxGeometry relative="1" as="geometry"/>
+    </mxCell>
+  </root>
+</mxGraphModel>
